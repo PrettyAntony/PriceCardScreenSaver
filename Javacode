@@ -1,0 +1,603 @@
+
+
+/**
+ * The Fragment is Attached with mainActivity
+ * Usage: The activity will display the first screen after Login
+ * This will display the price Information of the devices
+ * The price Information will fetch from the server or Data Base
+ */
+public class PriceFragment extends ParentFragment implements View.OnClickListener, ClickListener, View.OnTouchListener, Observer {
+
+    public PriceFragment() {
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_home, container, false);
+
+    }
+
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        try {
+            /**
+             * INSTANCE VARIABLE INITIALIZATION
+             *
+             * */
+            this.mRvPriceList = (RecyclerView) mActivity.
+                    findViewById(R.id.rv_device_memory_list);
+            LinearLayoutManager manager = new LinearLayoutManager(mActivity);
+            manager.setOrientation(LinearLayoutManager.HORIZONTAL);
+            this.mRvPriceList.setLayoutManager(manager);
+
+            this.mRvColorList = (RecyclerView) mActivity.
+                    findViewById(R.id.rv_device_color_list);
+            LinearLayoutManager manager1 = new LinearLayoutManager(mActivity);
+            manager1.setOrientation(LinearLayoutManager.HORIZONTAL);
+            this.mRvColorList.setLayoutManager(manager1);
+
+
+            this.mTvManufacturer = (TextView) mActivity.
+                    findViewById(R.id.tv_manufacturer);
+            this.mTvDeviceName = (TextView) mActivity
+                    .findViewById(R.id.tv_device);
+            this.mTvCurrency = (TextView) mActivity.
+                    findViewById(R.id.tv_currency);
+            this.mTvAmount = (TextView) mActivity.
+                    findViewById(R.id.tv_amount);
+            this.mTvCents = (TextView) mActivity
+                    .findViewById(R.id.tv_cents);
+            this.mTvMonths = (TextView) mActivity
+                    .findViewById(R.id.tv_mo);
+            this.mTvPriceDetail = (TextView) mActivity
+                    .findViewById(R.id.tv_price_detail);
+
+            Typeface robotofontBold = Typeface.createFromAsset(mActivity.getAssets(), "fonts/Roboto-Medium.ttf");
+            this.mTvCurrency.setTypeface(robotofontBold);
+            Typeface robotofont = Typeface.createFromAsset(mActivity.getAssets(), "fonts/Roboto-Regular.ttf");
+            this.mTvPriceDetail.setTypeface(robotofont);
+              mOfflineIcn = (ImageView) mActivity
+                    .findViewById(R.id.iv_offline);
+
+
+            this.mTvColor = (TextView) mActivity
+                    .findViewById(R.id.tv_color);
+            this.mTvDisclaimerContent = (TextView) mActivity
+                    .findViewById(R.id.tv_disclaimer_content_txt);
+            this.mTvDisclaimerText = (TextView) mActivity
+                    .findViewById(R.id.click_text);
+
+            this.mRlColorContainer = (RelativeLayout) mActivity.
+                    findViewById(R.id.rl_color_container);
+            this.mRlHomeContainer = (RelativeLayout) mActivity.
+                    findViewById(R.id.rl_home_container);
+            this.mLlDisclaimerContainer = (LinearLayout) mActivity.
+                    findViewById(R.id.ll_disclaimer_container);
+            this.mRlHeaderContainer = (RelativeLayout) mActivity.
+                    findViewById(R.id.header_container);
+            this.mRlDisclaimerRoot = (RelativeLayout) mActivity.
+                    findViewById(R.id.rl_disclaimer_container);
+            this.mRlPriceContainer = (RelativeLayout) mActivity.
+                    findViewById(R.id.rl_price_info_container);
+            this.mScrollView = (ScrollView) mActivity.
+                    findViewById(R.id.scrollView);
+
+            mSpDataSuuplier = new SharedPrefDataSupplier(mActivity);
+            setObserver();
+            /**
+             *
+             * ITEM CLICK
+             * The Item click of each item inside Login
+             * instantiated from here
+             *
+             * */
+
+            this.mTvDisclaimerText.setOnClickListener(this);
+            this.mLlDisclaimerContainer.setOnClickListener(this);
+            this.mScrollView.setOnTouchListener(this);
+
+            update(null, null);
+
+            /**
+             * GET BUNDLE DATA
+             */
+            Bundle data = getArguments();
+            if (data != null) {
+                setPriceDataUI(data);
+            }
+            if(!isNetworkConnected()) {
+                mOfflineIcn.setVisibility(View.VISIBLE);
+                mOfflineIcn.setColorFilter(Color.parseColor(getCarrierColor()), PorterDuff.Mode.SRC_ATOP);
+                ;
+            }
+            else
+            {
+                mOfflineIcn.setVisibility(View.GONE);
+            }
+
+        } catch (Exception e) {
+            PriceCardLog.e(TAG, e.getMessage());
+        }
+    }
+public boolean isNetworkConnected() {
+    ConnectivityManager cm =
+            (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+
+    NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+    boolean isConnected = activeNetwork != null &&
+            activeNetwork.isConnectedOrConnecting();
+    return isConnected;
+}
+    private void setPriceDataUI(Bundle data) {
+
+        mPriceList = data.getParcelableArrayList("product_info_list");
+        int currentPos = data.getInt("price_selected_pos", 0);
+        mStorageValue = data.getString("storage_value");
+
+
+        if (mPriceList == null) {
+            return;
+        }
+
+        if (currentPos >= mPriceList.size()) {
+            currentPos = 0;
+        }
+
+        addColorListData(currentPos);
+        /**
+         * Fetch the data from server and set it to the View
+         *
+         */
+        setAdapter();
+
+        /**
+         * Add 0 Position to price
+         */
+        changePrice(currentPos);
+
+        setAnimation();
+    }
+
+
+    private void addColorListData(int position) {
+        String colorList = mPriceList.get(position).getmColorList();
+        mColorList = new ArrayList<>();
+        if (colorList != null) {
+            for (String color : colorList.split(",")) {
+                ColorModel object = new ColorModel();
+                object.setmColor(color);
+                mColorList.add(object);
+            }
+        }
+    }
+
+    private void setAnimation() {
+
+        try {
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    YoYo.with(Techniques.SlideInLeft)
+                            .duration(PRICE_ANIM_CONST)
+                            .playOn(mRlHeaderContainer);
+                }
+            });
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    YoYo.with(Techniques.SlideInRight)
+                            .duration(PRICE_ANIM_CONST)
+                            .playOn(mRlPriceContainer);
+                }
+            });
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    YoYo.with(Techniques.SlideInUp)
+                            .duration(PRICE_ANIM_CONST)
+                            .playOn(mRvPriceList);
+                }
+            });
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    YoYo.with(Techniques.BounceIn)
+                            .duration(PRICE_ANIM_CONST)
+                            .withListener(new Animator.AnimatorListener() {
+                                @Override
+                                public void onAnimationStart(Animator animation) {
+                                    mTvDisclaimerText.setVisibility(View.VISIBLE);
+                                }
+
+                                @Override
+                                public void onAnimationEnd(Animator animation) {
+
+                                }
+
+                                @Override
+                                public void onAnimationCancel(Animator animation) {
+
+                                }
+
+                                @Override
+                                public void onAnimationRepeat(Animator animation) {
+
+                                }
+                            })
+                            .playOn(mRlDisclaimerRoot);
+
+                }
+            }, 1000);
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    YoYo.with(Techniques.SlideInUp)
+                            .duration(PRICE_ANIM_CONST)
+                            .playOn(mRlColorContainer);
+
+                }
+            });
+        } catch (Exception e) {
+            PriceCardLog.e(TAG, e.getMessage());
+        }
+    }
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        this.mActivity = (Activity) context;
+        this.mCallBack = (PriceInterface) context;
+        this.mNavIconHideCallback = (NavigationIconHideListener) context;
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        this.mActivity = null;
+        this.mCallBack = null;
+        this.mNavIconHideCallback = null;
+    }
+
+    @Override
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.click_text: {
+                handleDisclaimerClick();
+            }
+            break;
+            case R.id.ll_disclaimer_container: {
+                handleDisclaimerClick();
+            }
+            break;
+        }
+    }
+
+    /**
+     * Disclaimer click handling
+     * Once user click the same, the animated popup window will come with data
+     */
+    private void handleDisclaimerClick() {
+        try {
+            if (mLlDisclaimerContainer.getVisibility() == View.VISIBLE) {
+                YoYo.with(Techniques.SlideOutRight)
+                        .duration(PRICE_ANIM_CONST)
+                        .withListener(new Animator.AnimatorListener() {
+                            @Override
+                            public void onAnimationStart(Animator animation) {
+
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                mLlDisclaimerContainer.setVisibility(View.INVISIBLE);
+                                mTvDisclaimerText.setVisibility(View.VISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationCancel(Animator animation) {
+                                mLlDisclaimerContainer.setVisibility(View.INVISIBLE);
+                                mTvDisclaimerText.setVisibility(View.VISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animator animation) {
+
+                            }
+                        })
+                        .playOn(mLlDisclaimerContainer);
+
+            } else {
+                mLlDisclaimerContainer.setVisibility(View.VISIBLE);
+                YoYo.with(Techniques.BounceIn)
+                        .duration(PRICE_ANIM_CONST)
+                        .withListener(new Animator.AnimatorListener() {
+                            @Override
+                            public void onAnimationStart(Animator animation) {
+                                mTvDisclaimerText.setVisibility(View.INVISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animator animation) {
+                                mLlDisclaimerContainer.setVisibility(View.VISIBLE);
+                                mTvDisclaimerText.setVisibility(View.INVISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationCancel(Animator animation) {
+                                mLlDisclaimerContainer.setVisibility(View.VISIBLE);
+                                mTvDisclaimerText.setVisibility(View.INVISIBLE);
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animator animation) {
+
+                            }
+                        })
+                        .playOn(mLlDisclaimerContainer);
+            }
+        } catch (Exception e) {
+            PriceCardLog.e(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * Set Adapter
+     * Attach the dynamic change value of device specification List
+     * The value anc color wil fetch from service/ Data base
+     */
+    private void setAdapter() {
+        try {
+            mAdapter = new PriceAdapter(mActivity, mActivity, mPriceList);
+            mAdapter.setOnClickListener(this);
+
+            /**
+             * For Color Enable Disable
+             * From Server
+             * @05/02/2017
+             */
+            if (mSpDataSuuplier.ismAppColorEnabled()) {
+                mRvColorList.setVisibility(View.VISIBLE);
+                mTvColor.setVisibility(View.VISIBLE);
+                mColorAdapter = new ColorAdapter(mActivity, mColorList);
+                mRvColorList.setAdapter(mColorAdapter);
+            } else {
+                mRvColorList.setVisibility(View.GONE);
+                mTvColor.setVisibility(View.GONE);
+            }
+
+            if (mStorageValue.equalsIgnoreCase("multi-storage")) {
+                mRvPriceList.setAdapter(mAdapter);
+            }
+        } catch (Exception e) {
+            PriceCardLog.e(TAG, e.getMessage());
+        }
+    }
+
+    /**
+     * Item Click
+     * If the user click any one of the item inside the
+     *
+     * @param view     ; Clicked View
+     * @param position : Currently Clicked Position
+     */
+    @Override
+    public void itemClickListener(View view, int position) {
+        if (position >= mPriceList.size()) {
+            return;
+        }
+
+        mCallBack.updateCurrentPositionToMain(position);
+        changePrice(position);
+    }
+
+
+    /**
+     * Change the Price of the device
+     *
+     * @param position
+     */
+
+    private void changePrice(int position) {
+        try {
+            for (ProductInfoModel priceModel : mPriceList) {
+                priceModel.setIsSelected(false);
+            }
+            ProductInfoModel object = mPriceList.get(position);
+            object.setIsSelected(true);
+            mAdapter.notifyDataSetChanged();
+
+            addColorListData(position);
+
+            if (mColorList != null) {
+                mColorAdapter = new ColorAdapter(mActivity, mColorList);
+                mRvColorList.setAdapter(mColorAdapter);
+            }
+
+            /**
+             * Change the Layout
+             */
+
+            if (nullChecker(object.getmDeviceName())) {
+                this.mTvDeviceName.setText(object.getmDeviceName());
+            }
+            if (nullChecker(object.getmManufactureName())) {
+                this.mTvManufacturer.setText(object.getmManufactureName());
+            }
+            if (nullChecker(object.getmDisclaimer())) {
+                this.mTvDisclaimerContent.setText(object.getmDisclaimer());
+            }
+            if (object.getmPriceObject() != null) {
+                PriceModel priceObj = object.getmPriceObject();
+                if (nullChecker(priceObj.getmCurrency())) {
+                    this.mTvCurrency.setText(priceObj.getmCurrency());
+                }
+                String[] valueArray = null;
+
+                if (nullChecker(mSpDataSuuplier.getmProductType()) &&
+                        mSpDataSuuplier.getmProductType().equalsIgnoreCase("P")) {
+                    if (nullChecker(String.valueOf(object.getmFullRetailPrice()))) {
+
+                        if (object.getmFullRetailPrice() == 0) {
+                            if (nullChecker(priceObj.getmInstalment())) {
+                                this.mTvMonths.setText(priceObj.getmInstalment());
+                                setRetailPrice(priceObj);
+                            }
+                        } else {
+                            this.mTvPriceDetail.setText(getResources().getString(R.string.retail_price) +
+                                    " " + priceObj.getmCurrency() + " " + priceObj.getmMonthlyCostValue() + ",  "
+                                    + getResources().getString(R.string.plus_tax));
+                        }
+                    }
+                    if (nullChecker(priceObj.getmMonthlyCostValue())) {
+                        valueArray = priceObj.getmMonthlyCostValue().split("\\.");
+                    }
+                } else {
+                    this.mTvMonths.setText("");
+                    if (nullChecker(priceObj.getmMainPrice())) {
+                        valueArray = priceObj.getmMainPrice().split("\\.");
+                    }
+                    setRetailPrice(priceObj);
+                }
+
+                try {
+                    setFontStyle(valueArray);
+                    if (valueArray != null && valueArray.length > 0) {
+                        this.mTvAmount.setText(valueArray[0]);
+                    } else {
+                        this.mTvAmount.setText("00");
+                        this.mTvCents.setText("00");
+                    }
+                    if (valueArray != null && valueArray.length > 1) {
+                        this.mTvCents.setText(valueArray[1]);
+                    } else {
+                        this.mTvCents.setText("");
+                    }
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    PriceCardLog.e(TAG, e.getMessage());
+                }
+
+            }
+        } catch (Exception e) {
+            LogUtil.logException(TAG,e);
+        }
+
+    }
+
+    /**
+     * method to set appropriate font sizes for different prices
+     *
+     * @param array
+     */
+    private void setFontStyle(String[] array) {
+        if (array != null && array.length > 0) {
+
+            int medLength = PriceCardApp.IS_TABLET ? 5 : 4;
+            if (array[0].length() > medLength) {
+
+                if (Build.VERSION.SDK_INT < 23) {
+                    mTvAmount.setTextAppearance(getContext(), R.style.textStyleMediumForPrice);
+                    mTvCents.setTextAppearance(getContext(), R.style.textStyleMediumForCent);
+                    mTvMonths.setTextAppearance(getContext(), R.style.textStyleMediumForMO);
+                } else {
+                    mTvAmount.setTextAppearance(R.style.textStyleMediumForPrice);
+                    mTvCents.setTextAppearance(R.style.textStyleMediumForCent);
+                    mTvMonths.setTextAppearance(R.style.textStyleMediumForMO);
+                }
+
+
+            } else {
+                if (Build.VERSION.SDK_INT < 23) {
+                    mTvAmount.setTextAppearance(getContext(), R.style.textStyleLargeForPrice);
+                    mTvCents.setTextAppearance(getContext(), R.style.textStyleLargeForCent);
+                    mTvMonths.setTextAppearance(getContext(), R.style.textStyleLargeForCent);
+                } else {
+                    mTvAmount.setTextAppearance(R.style.textStyleLargeForPrice);
+                    mTvCents.setTextAppearance(R.style.textStyleLargeForCent);
+                    mTvMonths.setTextAppearance(R.style.textStyleLargeForCent);
+                }
+
+            }
+        }
+
+    }
+
+    /**
+     * Method to set retail price
+     *
+     * @param priceObj
+     */
+    private void setRetailPrice(PriceModel priceObj) {
+
+        String priceDetail = "";
+        if (nullChecker(priceObj.getmDownPayment())) {
+            priceDetail = priceObj.getmDownPayment() + "\n";
+        }
+        if (nullChecker(priceObj.getmPrice())) {
+            priceDetail = priceDetail + priceObj.getmPrice() + "\n";
+        }
+        if (nullChecker(priceObj.getmPriceDetails())) {
+            priceDetail = priceDetail + priceObj.getmPriceDetails();
+        }
+        mTvPriceDetail.setText(priceDetail);
+
+    }
+
+    /**
+     * COMMON FOR ALL FIELDS
+     */
+    private boolean nullChecker(String key) {
+        if (key != null && key.toString().length() > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        mNavIconHideCallback.navIconHideCallback(event);
+        return false;
+    }
+
+    public void colorInversionCallback() {
+        mTvDisclaimerText.setTextColor(ImageUtility.getInvertedColor(mTvDisclaimerText.getCurrentTextColor()));
+        mTvDisclaimerContent.setTextColor(ImageUtility.getInvertedColor(mTvDisclaimerContent.getCurrentTextColor()));
+        GradientDrawable drawable = (GradientDrawable) mLlDisclaimerContainer.getBackground();
+        drawable.setColor(ContextCompat.getColor(mActivity, R.color.app_black_color));
+    }
+
+    public void revertColorInversionCallback() {
+        mTvDisclaimerText.setTextColor(mTvDisclaimerText.getCurrentTextColor());
+        mTvDisclaimerContent.setTextColor(mTvDisclaimerContent.getCurrentTextColor());
+        GradientDrawable drawable = (GradientDrawable) mLlDisclaimerContainer.getBackground();
+        drawable.setColor(ContextCompat.getColor(mActivity, R.color.white_color));
+    }
+
+    private void setObserver() {
+        StoreTimeObservable storeTimeObservable = new StoreTimeObservable();
+        storeTimeObservable.addObserver(this);
+    }
+
+    @Override
+    public void update(Observable o, Object arg) {
+        if (!mSpDataSuuplier.isStoreOpen()) {
+            colorInversionCallback();
+        } else {
+            revertColorInversionCallback();
+        }
+        if (mColorAdapter != null && mColorAdapter.getItemCount() > 0) {
+            mColorAdapter.notifyDataSetChanged();
+        }
+        if (mAdapter != null && mAdapter.getItemCount() > 0) {
+            mAdapter.notifyDataSetChanged();
+        }
+    }
+    private String getCarrierColor() {
+        if (mSpDataSuuplier.isStoreOpen()) {
+            return  mSpDataSuuplier.getmCarrierColor();
+        } else {
+           return ImageUtility.getInvertedColor(mSpDataSuuplier.getmCarrierColor());
+        }
+    }
+}
